@@ -54,42 +54,36 @@ def buscar_editais():
             break
 
         soup = BeautifulSoup(resp.text, "html.parser")
-        rows = soup.select("table tr, .views-row, article")
 
-        # Tenta encontrar linhas com data no formato dd/mm/yyyy
+        # Each edital is in a .views-row inside .view-content
+        rows = soup.select(".view-content .views-row")
         encontrados_nesta_pagina = []
-        for tag in soup.find_all(string=True):
-            text = tag.strip()
-            # Detecta padrões de data como "06/03/2026 - 12:00"
-            if len(text) >= 10 and text[2] == "/" and text[5] == "/" and text[8:12].isdigit():
-                data_str = text[:10]  # "dd/mm/yyyy"
-                # Tenta pegar o título mais próximo
-                parent = tag.parent
-                titulo = ""
-                link = ""
-                # Sobe na árvore em busca de um link ou título
-                for _ in range(6):
-                    if parent is None:
-                        break
-                    a_tag = parent.find("a", href=True)
-                    if a_tag:
-                        titulo = a_tag.get_text(strip=True)
-                        href = a_tag["href"]
-                        link = href if href.startswith("http") else f"https://www.inbio.ufu.br{href}"
-                        break
-                    parent = parent.parent
 
-                try:
-                    data = datetime.strptime(data_str, "%d/%m/%Y")
-                except ValueError:
-                    continue
+        for row in rows:
+            titulo_tag = row.select_one("h3.titulo a")
+            data_tag = row.select_one(".field-name-ultima-alteracao .field-item")
 
-                encontrados_nesta_pagina.append({
-                    "titulo": titulo,
-                    "data": data_str,
-                    "data_obj": data,
-                    "link": link,
-                })
+            if not titulo_tag or not data_tag:
+                continue
+
+            titulo = titulo_tag.get_text(strip=True)
+            href = titulo_tag.get("href", "")
+            link = href if href.startswith("http") else f"https://www.inbio.ufu.br{href}"
+
+            # Date text format: "06/03/2026 - 12:00"
+            data_raw = data_tag.get_text(strip=True)
+            data_str = data_raw[:10]  # "dd/mm/yyyy"
+            try:
+                data_obj = datetime.strptime(data_str, "%d/%m/%Y")
+            except ValueError:
+                continue
+
+            encontrados_nesta_pagina.append({
+                "titulo": titulo,
+                "data": data_str,
+                "data_obj": data_obj,
+                "link": link,
+            })
 
         if not encontrados_nesta_pagina:
             break
@@ -97,7 +91,7 @@ def buscar_editais():
         editais.extend(encontrados_nesta_pagina)
 
         # Verifica se há próxima página
-        proximo = soup.select_one('a[title="Ir para a próxima página"], .pager__item--next a')
+        proximo = soup.select_one('a[title="Ir para a próxima página"], .pager__item--next a, li.pager-next a')
         if not proximo:
             break
         page += 1
