@@ -36,4 +36,5 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add editais_state.json
           git diff --staged --quiet || git commit -m "chore: atualizar estado dos editais [skip ci]"
+          git pull --rebase
           git push
